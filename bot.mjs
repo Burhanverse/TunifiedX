@@ -1,7 +1,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import LastFmNode from 'lastfmapi';
 import { fetchSpotifyAlbumArt } from './src/spotify.mjs';
-import { getUserLastfmUsername, setUserLastfmUsername, unsetUserLastfmUsername } from './src/utils.mjs';
+import { getUserLastfmUsername } from './src/utils.mjs';
 import dotenv from 'dotenv';
 import moment from 'moment';
 import path from 'path';
@@ -31,27 +31,38 @@ bot.command('status', async (ctx) => {
         }
 
         const track = data.track[0];
-        const lastPlayed = track.date ? moment.unix(track.date.uts).format('LLL') : 'Now Playing';
-        const albumArt = await fetchSpotifyAlbumArt(track.album['#text']);
+        const trackName = track.name;
+        const artistName = track.artist['#text'];
+        const albumName = track.album['#text'] || 'Unknown Album';
+        const playCount = track.playcount || 'N/A';
 
-        const response = `${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is listening to:\n\n` +
-            `**Song:** ${track.name}\n` +
-            `**Artist:** ${track.artist['#text']}\n` +
-            `**Album:** ${track.album['#text']}\n`
+        // Check if the track is currently playing
+        const lastPlayed = track.date ? 
+            moment.unix(track.date.uts).format('DD/MM/YYYY HH:mm:ss') : 
+            moment().format('DD/MM/YYYY HH:mm:ss');  // Use current time for now playing
+
+        const albumArt = await fetchSpotifyAlbumArt(albumName);
+        const songLinkId = track.mbid || track.url.split('/').pop();
+
+        const response = `<b>${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is Listening to:</b>\n\n` +
+            `<b>Song:</b> ${trackName}\n` +
+            `<b>Artist:</b> ${artistName}\n` +
+            `<b>Album:</b> ${albumName}\n` +
+            `<b>Play Count:</b> ${playCount}\n` +
+            `<b>Last Played:</b> ${lastPlayed}`;
 
         const buttons = Markup.inlineKeyboard([
-            Markup.button.url('Listen Now', track.url),
-            Markup.button.url('About Artist', `https://www.google.com/search?q=${encodeURIComponent(track.artist['#text'] + ' artist bio')}`)
-        ],
-        [
+            Markup.button.url('Listen Now', `https://song.link/s/${songLinkId}`),
+            Markup.button.url(`About ${artistName.split(",")[0]}`, `https://www.google.com/search?q=${encodeURIComponent(artistName + ' artist bio')}`)
+        ], [
             Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
         ]);
 
-        if (albumArt.includes('http')) {  // If album art is a URL
-            ctx.replyWithPhoto({ url: albumArt }, { caption: response, ...buttons });
-        } else {  // If album art is the fallback default.png
+        if (albumArt.includes('http')) {
+            ctx.replyWithPhoto({ url: albumArt }, { caption: response, parse_mode: 'HTML', ...buttons });
+        } else {
             const imagePath = path.join(__dirname, albumArt);
-            ctx.replyWithPhoto({ source: imagePath }, { caption: response, ...buttons });
+            ctx.replyWithPhoto({ source: imagePath }, { caption: response, parse_mode: 'HTML', ...buttons });
         }
     });
 });
