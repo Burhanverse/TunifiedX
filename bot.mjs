@@ -34,7 +34,7 @@ bot.command('status', async (ctx) => {
         const lastPlayed = track.date ? moment.unix(track.date.uts).format('LLL') : 'Now Playing';
         const albumArt = await fetchSpotifyAlbumArt(track.album['#text']);
 
-        const response = `${ctx.from.first_name} is listening to:\n\n` +
+        const response = `${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is listening to:\n\n` +
             `**Song:** ${track.name}\n` +
             `**Artist:** ${track.artist['#text']}\n` +
             `**Album:** ${track.album['#text']}\n`
