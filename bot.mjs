@@ -1,9 +1,10 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import LastFmNode from 'lastfmapi';
 import { fetchSpotifyAlbumArt } from './src/spotify.mjs';
 import { fetchYoutubeThumbnail } from './src/youtube.mjs';
 import { getUserLastfmUsername, setUserLastfmUsername, unsetUserLastfmUsername } from './src/utils.mjs';
 import dotenv from 'dotenv';
+import moment from 'moment';
 
 dotenv.config();
 
@@ -13,6 +14,8 @@ const lastfm = new LastFmNode({
     api_key: process.env.LASTFM_API_KEY,
     secret: process.env.LASTFM_SECRET
 });
+
+let lastListenedTime = null;
 
 bot.command('set', async (ctx) => {
     const username = ctx.message.text.split(' ')[1];
@@ -40,10 +43,26 @@ bot.command('status', async (ctx) => {
         }
 
         const track = data.track[0];
+        const lastPlayed = track.date ? moment.unix(track.date.uts).format('LLL') : 'Now Playing';
         const albumArt = await fetchSpotifyAlbumArt(track.album['#text']) || await fetchYoutubeThumbnail(track.url.split('/').pop());
-        
-        const response = `${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is listening to:\n\nSong: ${track.name}\nArtist: ${track.artist['#text']}\nAlbum: ${track.album['#text']}`;
-        ctx.replyWithPhoto({ url: albumArt }, { caption: response });
+
+        const response = `${ctx.from.first_name} is listening to:\n\n` +
+            `**Song:** ${track.name}\n` +
+            `**Artist:** ${track.artist['#text']}\n` +
+            `**Album:** ${track.album['#text']}\n` +
+            `**Last Listened:** ${lastListenedTime}`;
+
+        const buttons = Markup.inlineKeyboard([
+            Markup.button.url('Listen Now', track.url),
+            Markup.button.url('About Artist', `https://www.google.com/search?q=${encodeURIComponent(track.artist['#text'] + ' artist bio')}`),
+            Markup.button.url('Share Track', track.url)
+        ]);
+
+        if (albumArt) {
+            ctx.replyWithPhoto({ url: albumArt }, { caption: response, ...buttons });
+        } else {
+            ctx.reply(response, buttons);
+        }
     });
 });
 
