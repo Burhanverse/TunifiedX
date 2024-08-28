@@ -41,8 +41,10 @@ bot.command('status', async (ctx) => {
 
         const buttons = Markup.inlineKeyboard([
             Markup.button.url('Listen Now', track.url),
-            Markup.button.url('About Artist', `https://www.google.com/search?q=${encodeURIComponent(track.artist['#text'] + ' artist bio')}`),
-            Markup.button.url('Share Track', track.url)
+            Markup.button.url('About Artist', `https://www.google.com/search?q=${encodeURIComponent(track.artist['#text'] + ' artist bio')}`)
+        ],
+        [
+            Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
         ]);
 
         if (albumArt.includes('http')) {  // If album art is a URL
