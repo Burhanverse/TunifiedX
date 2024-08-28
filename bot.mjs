@@ -30,40 +30,51 @@ bot.command('status', async (ctx) => {
             return ctx.reply('No recent tracks found.');
         }
 
-        const track = data.track[0];
-        const trackName = track.name;
-        const artistName = track.artist['#text'];
-        const albumName = track.album['#text'] || 'Unknown Album';
-        const playCount = track.playcount || 'N/A';
+        const recentTrack = data.track[0];
+        const trackName = recentTrack.name;
+        const artistName = recentTrack.artist['#text'];
+        const albumName = recentTrack.album['#text'] || 'Unknown Album';
+        const trackMbid = recentTrack.mbid;
 
-        // Check if the track is currently playing
-        const lastPlayed = track.date ? 
-            moment.unix(track.date.uts).format('DD/MM/YYYY HH:mm:ss') : 
-            moment().format('DD/MM/YYYY HH:mm:ss');  // Use current time for now playing
+        lastfm.track.getInfo({
+            artist: artistName,
+            track: trackName,
+            username: username,
+            mbid: trackMbid
+        }, async (err, trackInfo) => {
+            if (err || !trackInfo) {
+                return ctx.reply('Could not fetch track info.');
+            }
 
-        const albumArt = await fetchSpotifyAlbumArt(albumName);
-        const songLinkId = track.mbid || track.url.split('/').pop();
+            const playCount = trackInfo.userplaycount || 'N/A';
+            const lastPlayed = recentTrack.date ? 
+                moment.unix(recentTrack.date.uts).format('DD/MM/YYYY HH:mm:ss') : 
+                moment().format('DD/MM/YYYY HH:mm:ss');  // Use current time for now playing
 
-        const response = `<b>${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is Listening to:</b>\n\n` +
-            `<b>Song:</b> ${trackName}\n` +
-            `<b>Artist:</b> ${artistName}\n` +
-            `<b>Album:</b> ${albumName}\n` +
-            `<b>Play Count:</b> ${playCount}\n` +
-            `<b>Last Played:</b> ${lastPlayed}`;
+            const albumArt = await fetchSpotifyAlbumArt(albumName);
+            const songLinkId = trackInfo.mbid || trackInfo.url.split('/').pop();
 
-        const buttons = Markup.inlineKeyboard([
-            Markup.button.url('Listen Now', `https://song.link/s/${songLinkId}`),
-            Markup.button.url(`About ${artistName.split(",")[0]}`, `https://www.google.com/search?q=${encodeURIComponent(artistName + ' artist bio')}`)
-        ], [
-            Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
-        ]);
+            const response = `<b>${ctx.from.first_name} ${ctx.from.last_name ? ctx.from.last_name : ''} is Listening to:</b>\n\n` +
+                `<b>Song:</b> ${trackName}\n` +
+                `<b>Artist:</b> ${artistName}\n` +
+                `<b>Album:</b> ${albumName}\n` +
+                `<b>Play Count:</b> ${playCount}\n` +
+                `<b>Last Played:</b> ${lastPlayed}`;
 
-        if (albumArt.includes('http')) {
-            ctx.replyWithPhoto({ url: albumArt }, { caption: response, parse_mode: 'HTML', ...buttons });
-        } else {
-            const imagePath = path.join(__dirname, albumArt);
-            ctx.replyWithPhoto({ source: imagePath }, { caption: response, parse_mode: 'HTML', ...buttons });
-        }
+            const buttons = Markup.inlineKeyboard([
+                Markup.button.url('Listen Now', `https://song.link/s/${songLinkId}`),
+                Markup.button.url(`About ${artistName.split(",")[0]}`, `https://www.google.com/search?q=${encodeURIComponent(artistName + ' artist bio')}`)
+            ], [
+                Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
+            ]);
+
+            if (albumArt.includes('http')) {
+                ctx.replyWithPhoto({ url: albumArt }, { caption: response, parse_mode: 'HTML', ...buttons });
+            } else {
+                const imagePath = path.join(__dirname, albumArt);
+                ctx.replyWithPhoto({ source: imagePath }, { caption: response, parse_mode: 'HTML', ...buttons });
+            }
+        });
     });
 });
 
