@@ -36,6 +36,10 @@ bot.command('status', async (ctx) => {
         const albumName = recentTrack.album['#text'] || 'Unknown Album';
         const trackMbid = recentTrack.mbid;
 
+        // Determine if the track is currently playing
+        const isPlaying = recentTrack['@attr'] && recentTrack['@attr'].nowplaying === 'true';
+        const status = isPlaying ? 'Playing' : 'Paused';
+
         lastfm.track.getInfo({
             artist: artistName,
             track: trackName,
@@ -59,6 +63,7 @@ bot.command('status', async (ctx) => {
                 `<b>Artist:</b> ${artistName}\n` +
                 `<b>Album:</b> ${albumName}\n` +
                 `<b>Play Count:</b> ${playCount}\n` +
+                `<b>Status:</b> ${status}\n` +
                 `<b>Last Played:</b> ${lastPlayed}`;
 
             const buttons = Markup.inlineKeyboard([
