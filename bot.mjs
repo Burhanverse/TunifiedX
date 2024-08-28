@@ -67,9 +67,6 @@ bot.command('status', async (ctx) => {
                 `<b>Last Played:</b> ${lastPlayed}`;
 
             const buttons = Markup.inlineKeyboard([
-                Markup.button.url('Listen Now', `https://song.link/s/${songLinkId}`),
-                Markup.button.url(`About ${artistName.split(",")[0]}`, `https://www.google.com/search?q=${encodeURIComponent(artistName + ' artist bio')}`)
-            ], [
                 Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
             ]);
 
