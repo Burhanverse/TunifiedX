@@ -7,6 +7,7 @@ import moment from 'moment';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { LRUCache } from 'lru-cache';
+import { exec } from 'child_process';
 
 dotenv.config();
 
@@ -28,6 +29,22 @@ const trackCache = new LRUCache({
 
 // Rate limiter to prevent spamming
 const userCooldowns = new Map();
+let trackNotFoundErrors = 0;
+
+function restartBot() {
+    console.log('Restarting bot due to repeated "Track not found" errors...');
+    exec('pm2 restart bot', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error restarting bot: ${error.message}`);
+            return;
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return;
+        }
+        console.log(`stdout: ${stdout}`);
+    });
+}
 
 bot.command('set', async (ctx) => {
     const username = ctx.message.text.split(' ')[1];
@@ -57,7 +74,7 @@ bot.command('status', async (ctx) => {
         const timeLeft = ((cooldown - now) / 1000).toFixed(1);
         return ctx.reply(`Please wait ${timeLeft} seconds before using the command again.`);
     }
-    userCooldowns.set(userId, now + 5000); // 5-second cooldown
+    userCooldowns.set(userId, now + 10000); // 10-second cooldown
 
     try {
         const username = await getUserLastfmUsername(ctx.from.id);
@@ -145,7 +162,14 @@ bot.command('status', async (ctx) => {
 
     } catch (error) {
         console.error('Error processing status command:', error);
-        ctx.reply('An error occurred while processing your request.');
+        if (error.message === 'Track not found') {
+            trackNotFoundErrors++;
+            if (trackNotFoundErrors >= 1) {
+                restartBot();
+            }
+        } else {
+            ctx.reply('An error occurred while processing your request.');
+        }
     }
 });
 
