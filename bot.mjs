@@ -27,9 +27,9 @@ const trackCache = new LRUCache({
     ttl: 1000 * 15, // Cache data for 15 seconds
 });
 
-// Rate limiter to prevent spamming
+// User-specific rate limiter and error tracking
 const userCooldowns = new Map();
-let trackNotFoundErrors = 0;
+const userTrackNotFoundErrors = new Map();
 
 function restartBot() {
     console.log('Restarting bot due to repeated "Track not found" errors...');
@@ -77,7 +77,7 @@ bot.command('status', async (ctx) => {
     userCooldowns.set(userId, now + 10000); // 10-second cooldown
 
     try {
-        const username = await getUserLastfmUsername(ctx.from.id);
+        const username = await getUserLastfmUsername(userId);
         if (!username) {
             return ctx.reply('You need to set your Last.fm username first using /set.');
         }
@@ -163,8 +163,10 @@ bot.command('status', async (ctx) => {
     } catch (error) {
         console.error('Error processing status command:', error);
         if (error.message === 'Track not found') {
-            trackNotFoundErrors++;
-            if (trackNotFoundErrors >= 1) {
+            const errorCount = (userTrackNotFoundErrors.get(userId) || 0) + 1;
+            userTrackNotFoundErrors.set(userId, errorCount);
+
+            if (errorCount >= 2) {
                 restartBot();
             }
         } else {
