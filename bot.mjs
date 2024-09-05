@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import moment from 'moment';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { LRUCache } from 'lru-cache';
 import { exec } from 'child_process';
 
 dotenv.config();
@@ -21,13 +20,6 @@ const lastfm = new LastFmNode({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cache for storing recent track info
-const trackCache = new LRUCache({
-    max: 500,
-    ttl: 1000 * 15, // Cache data for 15 seconds
-});
-
-// User-specific rate limiter and error tracking
 const userCooldowns = new Map();
 const userTrackNotFoundErrors = new Map();
 
@@ -80,12 +72,6 @@ bot.command('status', async (ctx) => {
         const username = await getUserLastfmUsername(userId);
         if (!username) {
             return ctx.reply('You need to set your Last.fm username first using /set.');
-        }
-
-        // Check cache for recent track
-        const cachedTrack = trackCache.get(username);
-        if (cachedTrack) {
-            return ctx.replyWithPhoto(cachedTrack.photo, cachedTrack.options);
         }
 
         // Fetch recent track data
@@ -150,14 +136,10 @@ bot.command('status', async (ctx) => {
         };
 
         if (albumArt.includes('http')) {
-            const replyData = { photo: { url: albumArt }, options: photoOptions };
-            trackCache.set(username, replyData);
-            ctx.replyWithPhoto(replyData.photo, replyData.options);
+            ctx.replyWithPhoto(albumArt, photoOptions);
         } else {
             const imagePath = path.join(__dirname, albumArt);
-            const replyData = { photo: { source: imagePath }, options: photoOptions };
-            trackCache.set(username, replyData);
-            ctx.replyWithPhoto(replyData.photo, replyData.options);
+            ctx.replyWithPhoto({ source: imagePath }, photoOptions);
         }
 
     } catch (error) {
