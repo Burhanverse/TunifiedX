@@ -30,11 +30,13 @@ export async function fetchSpotifyAlbumArt(albumName) {
 
     const data = await response.json();
 
-    // Check if data.albums and data.albums.items exist before accessing
     if (data.albums && data.albums.items.length > 0) {
-        return data.albums.items[0].images[0].url;
-    } else {
-        // Return the path to the default image if no album art is found
-        return '/assets/default.png';
+        const album = data.albums.items.find(item => item.name.toLowerCase() === albumName.toLowerCase());
+        
+        if (album) {
+            return album.images[0].url;
+        }
     }
+
+    return '/assets/default.png';
 }

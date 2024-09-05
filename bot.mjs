@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import moment from 'moment';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
 
 dotenv.config();
 
@@ -22,21 +21,6 @@ const __dirname = path.dirname(__filename);
 
 const userCooldowns = new Map();
 const userTrackNotFoundErrors = new Map();
-
-function restartBot() {
-    console.log('Restarting bot due to repeated "Track not found" errors...');
-    exec('pm2 restart bot', (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error restarting bot: ${error.message}`);
-            return;
-        }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-            return;
-        }
-        console.log(`stdout: ${stdout}`);
-    });
-}
 
 bot.command('set', async (ctx) => {
     const username = ctx.message.text.split(' ')[1];
@@ -148,9 +132,7 @@ bot.command('status', async (ctx) => {
             const errorCount = (userTrackNotFoundErrors.get(userId) || 0) + 1;
             userTrackNotFoundErrors.set(userId, errorCount);
 
-            if (errorCount >= 2) {
-                restartBot();
-            }
+            // Removed the bot restart functionality
         } else {
             ctx.reply('An error occurred while processing your request.');
         }
