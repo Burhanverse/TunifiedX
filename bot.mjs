@@ -1,26 +1,39 @@
 import { Telegraf, Markup } from 'telegraf';
-import LastFmNode from 'lastfmapi';
 import { fetchSpotifyAlbumArt } from './src/spotify.mjs';
+import { getYouTubeAlbumArt } from './src/youtube.mjs';
 import { getUserLastfmUsername, setUserLastfmUsername, unsetUserLastfmUsername } from './src/utils.mjs';
 import dotenv from 'dotenv';
 import moment from 'moment';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fetch from 'node-fetch';
 
 dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const lastfm = new LastFmNode({
-    api_key: process.env.LASTFM_API_KEY,
-    secret: process.env.LASTFM_SECRET
-});
+const LASTFM_API_URL = 'http://ws.audioscrobbler.com/2.0/';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const userCooldowns = new Map();
 const userTrackNotFoundErrors = new Map();
+
+// Utility function to fetch data from Last.fm API
+async function fetchFromLastFm(method, params) {
+    const url = new URL(LASTFM_API_URL);
+    url.searchParams.append('api_key', process.env.LASTFM_API_KEY);
+    url.searchParams.append('format', 'json');
+    url.searchParams.append('method', method);
+    for (const key in params) {
+        url.searchParams.append(key, params[key]);
+    }
+
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+}
 
 bot.command('set', async (ctx) => {
     const username = ctx.message.text.split(' ')[1];
@@ -59,12 +72,8 @@ bot.command('status', async (ctx) => {
         }
 
         // Fetch recent track data
-        const recentTrack = await new Promise((resolve, reject) => {
-            lastfm.user.getRecentTracks({ user: username, limit: 1 }, (err, data) => {
-                if (err) return reject(err);
-                resolve(data.track[0]);
-            });
-        });
+        const recentTrackData = await fetchFromLastFm('user.getRecentTracks', { user: username, limit: 1 });
+        const recentTrack = recentTrackData.recenttracks.track[0];
 
         if (!recentTrack) {
             return ctx.reply('No recent tracks found.');
@@ -73,33 +82,23 @@ bot.command('status', async (ctx) => {
         const trackName = recentTrack.name;
         const artistName = recentTrack.artist['#text'];
         const albumName = recentTrack.album['#text'] || 'Unknown Album';
-        const trackMbid = recentTrack.mbid || null;
         const isPlaying = recentTrack['@attr'] && recentTrack['@attr'].nowplaying === 'true';
         const status = isPlaying ? 'Playing' : 'Paused';
 
         // Fetch track info
-        const trackInfo = await new Promise((resolve, reject) => {
-            lastfm.track.getInfo({
-                artist: artistName,
-                track: trackName,
-                username: username,
-                mbid: trackMbid
-            }, (err, info) => {
-                if (err) return reject(err);
-                resolve(info);
-            });
-        });
-
-        if (!trackInfo) {
-            return ctx.reply('Could not fetch track info.');
-        }
-
+        const trackInfoData = await fetchFromLastFm('track.getInfo', { artist: artistName, track: trackName, username });
+        const trackInfo = trackInfoData.track;
         const playCount = trackInfo.userplaycount || 'N/A';
         const lastPlayed = recentTrack.date ? 
             moment.unix(recentTrack.date.uts).format('DD/MM/YYYY HH:mm:ss') : 
             moment().format('DD/MM/YYYY HH:mm:ss');
 
-        const albumArt = await fetchSpotifyAlbumArt(albumName);
+        // Fetch album art from Spotify first, then YouTube, then fallback to default
+        let albumArt = await fetchSpotifyAlbumArt(albumName);
+        if (!albumArt.includes('http')) {
+            const youtubeAlbumArt = await getYouTubeAlbumArt(artistName, trackName);
+            albumArt = youtubeAlbumArt || '/assets/default.png';
+        }
 
         const response = `<b>${ctx.from.first_name} ${ctx.from.last_name || ''} is Listening to:</b>\n\n` +
             `<b>Song:</b> ${trackName}\n` +
@@ -120,10 +119,10 @@ bot.command('status', async (ctx) => {
         };
 
         if (albumArt.includes('http')) {
-            ctx.replyWithPhoto(albumArt, photoOptions);
+            await ctx.replyWithPhoto(albumArt, photoOptions);
         } else {
             const imagePath = path.join(__dirname, albumArt);
-            ctx.replyWithPhoto({ source: imagePath }, photoOptions);
+            await ctx.replyWithPhoto({ source: imagePath }, photoOptions);
         }
 
     } catch (error) {
@@ -131,8 +130,6 @@ bot.command('status', async (ctx) => {
         if (error.message === 'Track not found') {
             const errorCount = (userTrackNotFoundErrors.get(userId) || 0) + 1;
             userTrackNotFoundErrors.set(userId, errorCount);
-
-            // Removed the bot restart functionality
         } else {
             ctx.reply('An error occurred while processing your request.');
         }
