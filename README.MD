@@ -26,11 +26,11 @@
 
 5\.Start the bot:
 ```bash
-    npm start
+    npm run bot@latest
 ```
 - Updates to latest source from github, clean installs module as speciefied in package-lock.json and then starts the bot.
 
 OR for normal startup of the bot,
 ```bash
-    node bot.mjs
+    npm start
 ```
