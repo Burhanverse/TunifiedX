@@ -1,0 +1,17 @@
+{
+  "United States": "America/New_York",
+  "United Kingdom": "Europe/London",
+  "Germany": "Europe/Berlin",
+  "Japan": "Asia/Tokyo",
+  "India": "Asia/Kolkata",
+  "Australia": "Australia/Sydney",
+  "Brazil": "America/Sao_Paulo",
+  "Canada": "America/Toronto",
+  "China": "Asia/Shanghai",
+  "Russia": "Europe/Moscow",
+  "South Africa": "Africa/Johannesburg",
+  "France": "Europe/Paris",
+  "Italy": "Europe/Rome",
+  "Spain": "Europe/Madrid",
+  "Mexico": "America/Mexico_City"
+}

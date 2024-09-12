@@ -3,15 +3,15 @@ import { fetchSpotifyAlbumArt } from './src/spotify.mjs';
 import { getYouTubeAlbumArt } from './src/youtube.mjs';
 import { getUserLastfmUsername, setUserLastfmUsername, unsetUserLastfmUsername } from './src/utils.mjs';
 import dotenv from 'dotenv';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
+import { promises as fs } from 'fs'; // Import fs to read timezone.json
 
 dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-
 const LASTFM_API_URL = 'http://ws.audioscrobbler.com/2.0/';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +33,43 @@ async function fetchFromLastFm(method, params) {
     const response = await fetch(url);
     const data = await response.json();
     return data;
+}
+
+// Load the timezone data from timezone.json
+async function loadTimeZoneMapping() {
+    try {
+        const filePath = path.join(__dirname, 'timezone.json');
+        const data = await fs.readFile(filePath, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading timezone.json:', error);
+        return {}; // Return an empty object if there's an error
+    }
+}
+
+// Function to get the user's country from Last.fm
+async function fetchUserCountry(username) {
+    try {
+        const userData = await fetchFromLastFm('user.getInfo', { user: username });
+        return userData?.user?.country || null;
+    } catch (error) {
+        console.error('Error fetching user country:', error);
+        return null;
+    }
+}
+
+// Function to format time based on country timezone
+async function formatTimeByCountry(recentTrack, username) {
+    const country = await fetchUserCountry(username);
+    
+    // Load timezone mapping from file
+    const timeZoneMapping = await loadTimeZoneMapping();
+    
+    const timeZone = country ? timeZoneMapping[country] || 'UTC' : 'UTC'; // Default to UTC if no country or unknown country
+
+    return recentTrack.date
+        ? moment.unix(recentTrack.date.uts).tz(timeZone).format('MM/DD/YYYY h:mm:ss A')
+        : moment().tz(timeZone).format('MM/DD/YYYY h:mm:ss A');
 }
 
 bot.command('set', async (ctx) => {
@@ -89,9 +126,9 @@ bot.command('status', async (ctx) => {
         const trackInfoData = await fetchFromLastFm('track.getInfo', { artist: artistName, track: trackName, username });
         const trackInfo = trackInfoData.track;
         const playCount = trackInfo?.userplaycount || 'N/A';
-        const lastPlayed = recentTrack.date ?
-            moment.unix(recentTrack.date.uts).format('DD/MM/YYYY HH:mm:ss') :
-            moment().format('DD/MM/YYYY HH:mm:ss');
+
+        // Format the last played time based on the user's country timezone
+        const lastPlayed = await formatTimeByCountry(recentTrack, username);
 
         // Fetch album art from Spotify first, then YouTube (no fallback to default)
         let albumArt;
