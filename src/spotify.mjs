@@ -1,42 +1,41 @@
-import fetch from 'node-fetch';
-import { Buffer } from 'buffer';
+import SpotifyWebApi from 'spotify-web-api-node';
+import dotenv from 'dotenv';
 
-let token;
+dotenv.config();
 
-async function getSpotifyToken(clientId, clientSecret) {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-        },
-        body: 'grant_type=client_credentials'
-    });
+// Initialize the Spotify API client
+const spotifyApi = new SpotifyWebApi({
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET
+});
 
-    const data = await response.json();
-    token = data.access_token;
+async function getSpotifyToken() {
+    try {
+        const data = await spotifyApi.clientCredentialsGrant();
+        spotifyApi.setAccessToken(data.body['access_token']);
+    } catch (error) {
+        console.error('Error getting Spotify token:', error);
+        throw error;
+    }
 }
 
-export async function fetchSpotifyAlbumArt(albumName) {
-    if (!token) {
-        await getSpotifyToken(process.env.SPOTIFY_CLIENT_ID, process.env.SPOTIFY_CLIENT_SECRET);
+export async function fetchSpotifyAlbumArt(artistName, trackName) {
+    // Ensure we have a valid token
+    if (!spotifyApi.getAccessToken()) {
+        await getSpotifyToken();
     }
 
-    const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(albumName)}&type=album`, {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
+    try {
+        const response = await spotifyApi.searchTracks(`track:${trackName} artist:${artistName}`);
+        const tracks = response.body.tracks.items;
 
-    const data = await response.json();
-
-    if (data.albums && data.albums.items.length > 0) {
-        const album = data.albums.items.find(item => item.name.toLowerCase() === albumName.toLowerCase());
-        
-        if (album) {
-            return album.images[0].url;
+        if (tracks.length > 0) {
+            const track = tracks[0];
+            if (track.album && track.album.images.length > 0) {
+                return track.album.images[0].url;
+            }
         }
+    } catch (error) {
+        console.error('Error fetching album art from Spotify:', error);
     }
-
-    return '/assets/default.png';
 }

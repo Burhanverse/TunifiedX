@@ -133,7 +133,7 @@ bot.command('status', async (ctx) => {
         // Fetch album art from Spotify first, then YouTube (no fallback to default)
         let albumArt;
         try {
-            albumArt = await fetchSpotifyAlbumArt(albumName);
+            albumArt = await fetchSpotifyAlbumArt(artistName, trackName);
         } catch (spotifyError) {
             console.error('Spotify album art error:', spotifyError);
         }
