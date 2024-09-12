@@ -61,14 +61,14 @@ bot.command('status', async (ctx) => {
     const cooldown = userCooldowns.get(userId);
     if (cooldown && now < cooldown) {
         const timeLeft = ((cooldown - now) / 1000).toFixed(1);
-        return ctx.reply(`Please wait ${timeLeft} seconds before using the command again.`);
+        return ctx.reply(`Please wait ${timeLeft} seconds before using the command again.`, { reply_to_message_id: ctx.message.message_id });
     }
     userCooldowns.set(userId, now + 10000); // 10-second cooldown
 
     try {
         const username = await getUserLastfmUsername(userId);
         if (!username) {
-            return ctx.reply('You need to set your Last.fm username first using /set.');
+            return ctx.reply('You need to set your Last.fm username first using /set.', { reply_to_message_id: ctx.message.message_id });
         }
 
         // Fetch recent track data
@@ -76,7 +76,7 @@ bot.command('status', async (ctx) => {
         const recentTrack = recentTrackData.recenttracks.track[0];
 
         if (!recentTrack) {
-            return ctx.reply('No recent tracks found.');
+            return ctx.reply('No recent tracks found.', { reply_to_message_id: ctx.message.message_id });
         }
 
         const trackName = recentTrack.name;
@@ -88,18 +88,29 @@ bot.command('status', async (ctx) => {
         // Fetch track info
         const trackInfoData = await fetchFromLastFm('track.getInfo', { artist: artistName, track: trackName, username });
         const trackInfo = trackInfoData.track;
-        const playCount = trackInfo.userplaycount || 'N/A';
-        const lastPlayed = recentTrack.date ? 
-            moment.unix(recentTrack.date.uts).format('DD/MM/YYYY HH:mm:ss') : 
+        const playCount = trackInfo?.userplaycount || 'N/A';
+        const lastPlayed = recentTrack.date ?
+            moment.unix(recentTrack.date.uts).format('DD/MM/YYYY HH:mm:ss') :
             moment().format('DD/MM/YYYY HH:mm:ss');
 
-        // Fetch album art from Spotify first, then YouTube, then fallback to default
-        let albumArt = await fetchSpotifyAlbumArt(albumName);
-        if (!albumArt.includes('http')) {
-            const youtubeAlbumArt = await getYouTubeAlbumArt(artistName, trackName);
-            albumArt = youtubeAlbumArt || '/assets/default.png';
+        // Fetch album art from Spotify first, then YouTube (no fallback to default)
+        let albumArt;
+        try {
+            albumArt = await fetchSpotifyAlbumArt(albumName);
+        } catch (spotifyError) {
+            console.error('Spotify album art error:', spotifyError);
         }
 
+        if (!albumArt || !albumArt.includes('http')) {
+            try {
+                const youtubeAlbumArt = await getYouTubeAlbumArt(artistName, trackName);
+                albumArt = youtubeAlbumArt;
+            } catch (youtubeError) {
+                console.error('YouTube album art error:', youtubeError);
+            }
+        }
+
+        // Create response with track details
         const response = `<b>${ctx.from.first_name} ${ctx.from.last_name || ''} is Listening to:</b>\n\n` +
             `<b>Song:</b> ${trackName}\n` +
             `<b>Artist:</b> ${artistName}\n` +
@@ -112,27 +123,24 @@ bot.command('status', async (ctx) => {
             Markup.button.url('Made by AquaMods', 'https://akuamods.t.me')
         ]);
 
-        const photoOptions = {
-            caption: response,
-            parse_mode: 'HTML',
-            ...buttons
-        };
-
-        if (albumArt.includes('http')) {
-            await ctx.replyWithPhoto(albumArt, photoOptions);
+        // Send track details without image if no album art was found
+        if (albumArt && albumArt.includes('http')) {
+            await ctx.replyWithPhoto(albumArt, {
+                caption: response,
+                parse_mode: 'HTML',
+                ...buttons,
+                reply_to_message_id: ctx.message.message_id // Reply to the user's command
+            });
         } else {
-            const imagePath = path.join(__dirname, albumArt);
-            await ctx.replyWithPhoto({ source: imagePath }, photoOptions);
+            await ctx.replyWithHTML(response, {
+                reply_markup: buttons,
+                reply_to_message_id: ctx.message.message_id // Reply to the user's command
+            });
         }
 
     } catch (error) {
         console.error('Error processing status command:', error);
-        if (error.message === 'Track not found') {
-            const errorCount = (userTrackNotFoundErrors.get(userId) || 0) + 1;
-            userTrackNotFoundErrors.set(userId, errorCount);
-        } else {
-            ctx.reply('An error occurred while processing your request.');
-        }
+        ctx.reply('An error occurred while processing your request.', { reply_to_message_id: ctx.message.message_id });
     }
 });
 
