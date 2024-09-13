@@ -1,6 +1,6 @@
 {
   "name": "tunifiedx",
-  "version": "1.5.20",
+  "version": "1.5.30",
   "description": "lastfm bot",
   "main": "bot.mjs",
   "scripts": {
@@ -14,6 +14,7 @@
     "@distube/ytdl-core": "^4.14.4",
     "dotenv": "^16.4.5",
     "moment": "^2.30.1",
+    "moment-timezone": "^0.5.45",
     "node-fetch": "^3.3.2",
     "path": "^0.12.7",
     "spotify-web-api-node": "^5.0.2",
