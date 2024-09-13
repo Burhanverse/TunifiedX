@@ -1,6 +1,6 @@
 {
   "name": "tunifiedx",
-  "version": "1.5.30",
+  "version": "1.5.40",
   "description": "lastfm bot",
   "main": "bot.mjs",
   "scripts": {
